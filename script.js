@@ -129,7 +129,10 @@ function following() {
 
 //-------------- Open Post Model------------//
 function open_model() {
+    $(".index_inputs").val("");
+    $(".post-btn a").css("background-color", "grey")
     $("#post_modal").modal('show');
+    $(".index_inputs_span").text("500");
 }
 
 /*------------------- Show For You Posst-----------------*/
@@ -154,6 +157,80 @@ function show_user_post(username) {
         }
     });
 }
+
+/*------------------- Show Following-----------------*/
+function show_following() {
+    $.ajax({
+        url: "action.php",
+        type: "post",
+        data: { "action": "show_following" },
+        success: function (response) {
+            $(".following_list").html(response);
+            if (response == "") {
+                $(".following_list").html("<h3 class='no'>No Following Yet.<h3>");
+            }
+        }
+    });
+}
+/*------------------- Show Followers-----------------*/
+function show_followers() {
+    $.ajax({
+        url: "action.php",
+        type: "post",
+        data: { "action": "show_followers" },
+        success: function (response) {
+            $(".followers_list").html(response);
+            if (response == "") {
+                $(".user_followers_list").html("<h3 class='no'>No Followers Yet.<h3>");
+            }
+        }
+    });
+}
+
+/*------------------- Show User's Following-----------------*/
+function see_user_following(username) {
+    $.ajax({
+        url: "action.php",
+        type: "post",
+        data: { "action": "show_following", "username": username },
+        success: function (response) {
+            $(".user_following_list").html(response);
+            if (response == "") {
+                $(".user_following_list").html("<h3 class='no'>No Following Yet.<h3>");
+            }
+        }
+    });
+}
+
+/*------------------- Show User's Followers-----------------*/
+function see_user_followers(username) {
+    $.ajax({
+        url: "action.php",
+        type: "post",
+        data: { "action": "show_followers", "username": username },
+        success: function (response) {
+            $(".user_followers_list").html(response);
+            if (response == "") {
+                $(".user_followers_list").html("<h3 class='no'>No Followers Yet.<h3>");
+            }
+        }
+    });
+}
+/*------------------- Show Comments-----------------*/
+function show_comments() {
+    $.ajax({
+        url: "action.php",
+        type: "post",
+        data: { "action": "show_comments" },
+        success: function (response) {
+            $(".replies").html(response);
+            if (response == "") {
+                $(".replies").html("<h3 class='no'>No Comments Yet.<h3>");
+            }
+        }
+    });
+}
+
 /*------------------- Show Other User Media-----------------*/
 function show_user_media(username) {
     $.ajax({
@@ -162,6 +239,9 @@ function show_user_media(username) {
         data: { "action": "show_user_media", 'username': username },
         success: function (response) {
             $(".show_user_media").html(response);
+            if (response == "") {
+                $(".show_user_media").html("<h3 class='no'>No Media Yet.<h3>");
+            }
         }
     });
 }
@@ -294,12 +374,16 @@ function validate_edit(e) {
     // Patterns
     var emailPattern = /^[a-zA-Z0-9.]+\@[a-zA-Z]+\.[a-zA-Z]{2,4}$/;
     var usernamePattern = /^[a-zA-Z]{1,15}$/;
+    var imgPattern = /\.(jpg|JPG|jpeg|JPEG|png|PNG|gif|PNG|avif|AVIF)$/;
+
 
     // Input Values
     var name = $('#edit-name').val().trim();
     var username = $('#edit-username').val().trim();
     var email = $('#edit-email').val().trim();
     var dob = $('#edit-dob').val().trim();
+    var profile = $("#edit-profile-pic").val();
+    var cover = $("#edit-cover-pic").val();
 
     // ----------- Name Validation ------------
     if (name == "") {
@@ -313,6 +397,25 @@ function validate_edit(e) {
     else if (!usernamePattern.test(username)) {
         $("#err-editusername").text("Enter a valid username");
         isValid = false;
+    }
+    //------------ Image Validation-----------
+    if (!imgPattern.test(profile)) {
+        $("#err-profile").text("Profile image is not valid");
+        isValid = false;
+    }
+
+    if (profile == "") {
+        $("#err-profile").text("");
+        isValid = true;
+    }
+    if (!imgPattern.test(cover)) {
+        $("#err-cover").text("Cover image is not valid");
+        isValid = false;
+    }
+
+    if (cover == "") {
+        $("#err-cover").text("");
+        isValid = true;
     }
     // ----------- Email Validation ------------
     if (email == "") {
@@ -393,14 +496,21 @@ function edit_profile() {
     });
 }
 
-//-------------Before Delete-------------//
+//-------------Before Delete Post-------------//
 function before_delete(id) {
     $('#deleteModal').modal('show');
     $("#hidden").val(id);
 }
+
+//-------------Before Delete Notification-------------//
+function before_delete_notification(id) {
+    $('#delete_n_Modal').modal('show');
+    $("#n_hidden").val(id);
+}
+
 //--------------------- Delete Post-----------------//
 function delete_post() {
-    var conf = confirm("Do You Really Want To Delete?")
+    var conf = confirm("Do you really want to delete this post?");
     if (conf == true) {
         var id = $("#hidden").val();
         $.ajax({
@@ -412,7 +522,23 @@ function delete_post() {
                 show_media();
                 count_posts();
                 show_post();
-                console.log(data)
+            }
+        });
+    }
+}
+
+//--------------------- Delete Post-----------------//
+function delete_notification() {
+    var conf = confirm("Do you really want to delete this notification?");
+    if (conf == true) {
+        var id = $("#n_hidden").val();
+        $.ajax({
+            url: "action.php",
+            type: "post",
+            data: { 'action': 'delete_notification', 'id': id },
+            success: function (data) {
+                $('#delete_n_Modal').modal('hide');
+                show_notifications();
             }
         });
     }
@@ -493,8 +619,6 @@ function show_user(username) {
     window.location.href = 'user_profile.php?username=' + username;
 }
 
-
-
 //------------------Footer Who to follow-----------------//
 function footer() {
     $.ajax({
@@ -547,7 +671,7 @@ function signup() {
             setTimeout(function () {
                 $('.msg').fadeOut('slow');
                 window.location = 'index.php';
-            }, 300);
+            }, 100);
             $('#signup')[0].reset();
         }
     });
@@ -576,7 +700,7 @@ function login() {
                 $('#login-form')[0].reset();
                 setTimeout(function () {
                     window.location = 'index.php';
-                }, 300);
+                }, 100);
 
             } else {
                 $("#msg").html("<p class='p-2 rounded msg'>Incorrect, Please try again.</p>")
@@ -732,45 +856,131 @@ $(document).ready(function () {
     follower();
     show_notifications();
 
-    /*--------------------Follow-----------------------*/
-    $(document).on('click', '.n_following, .not_following', function () {
-        var other_user = $(this).data('other_user');
-        if ($(this).text() == 'Unfollow') {
-            var conf = confirm("Do you really want to unfollow @" + other_user + '?');
-            if (conf == true) {
-                $.ajax({
-                    url: "action.php",
-                    type: "post",
-                    data: { "action": "unfollow", 'other_user': other_user },
-                    success: function (data) {
-                        console.log(data)
-                        footer()
-                        following_post();
-                        show_more();
-                        following();
-                        follower();
-                    }
-                });
 
+    $(document).on('click', '.edit', function () {
+        $('.error').text("");
+        $(".username-span, .name-span").text("15");
+        $(".bio-span").text("150");
+        $(".username-span, .name-span, .bio-span").css("color", "black");
+    });
+
+    /*----------Profile Pic---------*/
+    $.ajax({
+        url: "action.php",
+        type: "post",
+        data: { "action": "profile_pic" },
+        success: function (data) {
+            if (data == "") {
+                $(".post_profile_pic").attr('src', 'images/profile_pic.png');
+            } else {
+                $(".post_profile_pic").attr('src', 'profile_pic/' + data);
             }
         }
-        if ($(this).text() == 'Follow') {
+    });
+
+
+    /*--------------------Search Users on keyup-----------------------*/
+    $(document).on('keyup', '.footer-search-input', function () {
+        var search = $(this).val().trim();
+        if (search != "") {
             $.ajax({
                 url: "action.php",
                 type: "post",
-                data: { "action": "follow_unfollow", 'other_user': other_user },
+                data: { "action": "search", 'search': search },
                 success: function (data) {
-                    console.log(data);
+                    if (data != "") {
+                        $("#searches").modal("show")
+                        $("#empty").modal("hide")
+                        $(".search_div").html(data)
+                    } else {
+                        $("#empty").modal("show");
+                        $("#searches").modal("hide")
+                        $(".try").text("No such user found.");
+                    }
+                }
+            });
+        } else {
+            $(".try").text("Try searching for people.");
+            $("#empty").modal("show")
+            $("#searches").modal("hide")
+        }
+    });
+    /*--------------------Search Users on focus-----------------------*/
+    $(document).on('focus', '.footer-search-input', function () {
+        var search = $(this).val().trim();
+        if (search != "") {
+            $.ajax({
+                url: "action.php",
+                type: "post",
+                data: { "action": "search", 'search': search },
+                success: function (data) {
+                    if (data != "") {
+                        $("#searches").modal("show")
+                        $("#empty").modal("hide")
+                        $(".search_div").html(data)
+                    } else {
+                        $("#empty").modal("show")
+                        $(".try").text("No such user found.");
+                    }
+                }
+            });
+        } else {
+            $(".try").text("Try searching for people.");
+            $("#empty").modal("show")
+            $("#searches").modal("hide")
+        }
+    });
+
+    /*--------------------Follow-----------------------*/
+   $(document).on('click', '.n_following, .not_following', function () {
+    var other_user = $(this).data('other_user');
+    var $btn = $(this); // Cache $(this)
+
+    if ($btn.text() == 'Unfollow') {
+        var conf = confirm("Do you really want to unfollow @" + other_user + '?');
+        if (conf) {
+            $.ajax({
+                url: "action.php",
+                type: "post",
+                data: { "action": "unfollow", 'other_user': other_user },
+                success: function (data) {
+                    // Change button text & style after unfollow
+                    $btn.text("Follow");
+                    $btn.css({
+                        "background-color": "black",
+                        "color": "#fff",
+                        "border": "none"
+                    });
+
                     following_post();
+                    show_more();
                     following();
                     follower();
                 }
             });
         }
-        $(this).text("Following");
-        following();
-        follower();
-    });
+    } else if ($btn.text() == 'Follow') {
+        $.ajax({
+            url: "action.php",
+            type: "post",
+            data: { "action": "follow_unfollow", 'other_user': other_user },
+            success: function (data) {
+                // Change button text & style after follow
+                $btn.text("Unfollow");
+                $btn.css({
+                    "background-color": "#ccc",
+                    "color": "#000",
+                    "border": "1px solid #999"
+                });
+
+                following_post();
+                following();
+                follower();
+            }
+        });
+    }
+});
+
 
     /*--------------------Show Unfollow Option on Mouseenter-----------------------*/
     $(document).on('mouseenter', '.n_following, .not_following', function () {
@@ -826,7 +1036,6 @@ $(document).ready(function () {
             type: 'post',
             data: { 'post_id': post_id, 'action': 'insert_comment', 'comment': comment },
             success: function (data) {
-                console.log(data)
                 $("#comment-modal-foryou").modal("hide");
                 $(".comment_span_foryou").text(500);
                 $(".comment_reply_btn_forYou").css('background-color', 'grey')
@@ -858,7 +1067,6 @@ $(document).ready(function () {
             type: 'post',
             data: { 'post_id': post_id, 'action': 'insert_comment', 'comment': comment },
             success: function (data) {
-                console.log(data)
                 $("#comment-modal").modal("hide");
                 $(".comment_span").text(500);
                 $(".comment_reply_btn").css('background-color', 'grey')
@@ -882,7 +1090,6 @@ $(document).ready(function () {
             type: 'POST',
             data: { "post_id": post_id, "action": "like", "type": "post" },
             success: function (response) {
-                console.log(response);
                 show_post();
                 show_foryou_post();
                 following_post();
@@ -1133,24 +1340,28 @@ $(document).ready(function () {
 
     //--------------Logout----------------//
     $("#logout").click(function () {
-        $.ajax({
-            url: "action.php",
-            type: "post",
-            data: { "action": "logout" },
-            success: function () {
-                $("#left-panel").hide();
-                $("#logout-loader").show();
-                $("body").css("background-color", "grey");
-                setTimeout(function () {
-                    window.location = 'login.php';
-                }, 300);
-            }
-        });
+        var conf = confirm('Are you sure to logout?');
+        if (conf == true) {
+            $.ajax({
+                url: "action.php",
+                type: "post",
+                data: { "action": "logout" },
+                success: function () {
+                    $("#left-panel").hide();
+                    $("#logout-loader").show();
+                    $("body").css("background-color", "grey");
+                    setTimeout(function () {
+                        window.location = 'login.php';
+                    }, 100);
+                }
+            });
+        }
     });
 
     //---------------------- Limit Characters while Editing User details-------------------------//
     var length = 15;
     var post = 500;
+    var bio = 150;
     $("#edit-name").keyup(function () {
         var len = length - $(this).val().trim().length;
         $(".name-span").text(len);
@@ -1347,6 +1558,32 @@ $(document).ready(function () {
         }
     });
 
+    //------------ Image Validation-----------
+
+    $("#edit-profile-pic").change(function () {
+        var profile = $("#edit-profile-pic").val();
+        var imgPattern = /\.(jpg|JPG|jpeg|JPEG|png|PNG|gif|PNG|avif|AVIF)$/;
+        if (!imgPattern.test(profile)) {
+            $("#err-profile").text("Profile image is not valid");
+            isValid = false;
+        }
+
+        if (profile == "") {
+            $("#err-profile").text("");
+        }
+    });
+    $("#edit-cover-pic").change(function () {
+        var cover = $("#edit-cover-pic").val();
+        var imgPattern = /\.(jpg|JPG|jpeg|JPEG|png|PNG|gif|PNG|avif|AVIF)$/;
+        if (!imgPattern.test(cover)) {
+            $("#err-cover").text("Cover image is not valid");
+            isValid = false;
+        }
+
+        if (cover == "") {
+            $("#err-cover").text("");
+        }
+    });
 
     /*------------------------------------- Modal Post Validation----------------------------*/
 

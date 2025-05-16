@@ -5,12 +5,7 @@ session_start();
 //----------------Fetch Data For Particular Logged in User---------------//
 if (isset($_POST['action']) && $_POST['action'] == 'fetch') {
     $username = $_SESSION['username'];
-    $sel_id = "SELECT id FROM twitter_users WHERE username = '$username'";
-    $run_id = $conn->query($sel_id);
-    while ($data = $run_id->fetch_object()) {
-        $user_id = $data->id;
-    }
-    $sel = "SELECT * FROM twitter_users WHERE id = '$user_id'";
+    $sel = "SELECT * FROM twitter_users WHERE username = '$username'";
     $run = $conn->query($sel);
 
     $data = [];
@@ -28,6 +23,14 @@ if (isset($_POST['action']) && $_POST['action'] == 'fetch') {
         );
     }
     echo json_encode($arr);
+}
+//----------------Profile Pic---------------//
+if (isset($_POST['action']) && $_POST['action'] == 'profile_pic') {
+    $username = $_SESSION['username'];
+    $sel = "SELECT * FROM twitter_users WHERE username = '$username'";
+    $run = $conn->query($sel);
+    $data = $run->fetch_object();
+    echo $data->profile_pic;
 }
 
 //----------------Follow Unfollow---------------//
@@ -301,11 +304,12 @@ if (isset($_POST['action']) && $_POST['action'] == 'footer') {
         }
         // Set button text based on follow status
         $btn_text = $is_following ? "Following" : "Follow";
+        $profile = $data->profile_pic ? 'profile_pic/' . $data->profile_pic . '' : 'images/profile_pic.png';
         $arr_footer .=
             " <div style = 'display: flex;' class='background'>
                 <div class='show-img' style='margin-top: 6px;' href='user_profile.php'  onclick='show_user(`$data->username`)'>
                     <a onclick='show_user(`$data->username`)'>
-                        <img src='images/profile_pic.png' height='40px' style='border-radius: 50%'>
+                        <img src=$profile height='40px' style='border-radius: 50%'>
                     </a>
                 </div>
                 <div class='show-to-follow-data' href='user_profile.php'  onclick='show_user(`$data->username`)'>
@@ -539,11 +543,11 @@ if (isset($_POST['action']) && $_POST['action'] == 'show_more') {
         }
         // Set button text based on follow status
         $btn_text = $is_following ? "Following" : "Follow";
+        $profile = $data->profile_pic ? 'profile_pic/' . $data->profile_pic . '' : 'images/profile_pic.png';
         $arr_footer .=
             " <div style = 'display: flex;' class= 'background-follow'>
                 <div class='showw-img' style='margin-top: 6px;'   onclick='show_user(`$data->username`)'>
-                    <a ><img src='images/profile_pic.png' 
-                        height='40px' width= '40px' style='border-radius: 50%'>
+                    <a ><img src=$profile height='40px' width= '40px' style='border-radius: 50%'>
                     </a>
                 </div>
                 <div class='show-to-followw-data' style='width:50%' onclick='show_user(`$data->username`)'>
@@ -640,8 +644,7 @@ if (isset($_POST['action']) && $_POST['action'] == "show_post") {
         $post_id = $data->id;
         $query = "SELECT COUNT(*) AS total_comments 
           FROM twitter_comments 
-          WHERE user_id = $user_id 
-          AND post_id = $post_id";
+          WHERE post_id = $post_id";
 
         $result = $conn->query($query);
 
@@ -813,13 +816,23 @@ if (isset($_POST['action']) && $_POST['action'] == 'delete_post') {
 }
 
 
-//----------------------- Like Post------------------//
+//----------------------- Delete Post------------------//
 
+if (isset($_POST['action']) && $_POST['action'] == 'delete_notification') {
+    $id = $_POST['id'];
+
+    $del = "DELETE FROM twitter_notifications WHERE id = '$id'";
+    $run = $conn->query($del);
+    echo 'Deleted';
+}
+
+
+//----------------------- Like Post------------------//
 if (isset($_POST['action']) && $_POST['action'] == 'like') {
 
     $username = $_SESSION['username'];
 
-    // Step 1: Get user ID
+    // Get user ID
     $fetch_id_query = "SELECT id FROM twitter_users WHERE username = '$username'";
     $run = $conn->query($fetch_id_query);
     if (!$run) {
@@ -828,12 +841,23 @@ if (isset($_POST['action']) && $_POST['action'] == 'like') {
     }
 
     $data = $run->fetch_object();
-    $id = $data->id;
+    $user_id = $data->id;
     $post_id = $_POST['post_id'];
     $type = $_POST['type'];
 
-    // Step 2: Check if already liked
-    $sel = "SELECT * FROM twitter_likes WHERE user_id = $id AND liked_id = $post_id";
+    // Get post owner (for notification)
+    $fetch_post_owner = "SELECT user_id FROM twitter_posts WHERE id = $post_id";
+    $run_owner = $conn->query($fetch_post_owner);
+    if (!$run_owner || $run_owner->num_rows == 0) {
+        echo "Post not found.";
+        exit;
+    }
+
+    $owner_data = $run_owner->fetch_object();
+    $post_owner_id = $owner_data->user_id;
+
+    // Check if already liked
+    $sel = "SELECT * FROM twitter_likes WHERE user_id = $user_id AND liked_id = $post_id";
     $res = $conn->query($sel);
     if (!$res) {
         echo "Like check error: " . $conn->error;
@@ -842,45 +866,76 @@ if (isset($_POST['action']) && $_POST['action'] == 'like') {
 
     if ($res->num_rows > 0) {
         // Unlike
-        $delete = "DELETE FROM twitter_likes WHERE user_id = $id AND liked_id = $post_id";
+        $delete = "DELETE FROM twitter_likes WHERE user_id = $user_id AND liked_id = $post_id";
         $result = $conn->query($delete);
         if (!$result) {
             echo "Delete error: " . $conn->error;
         } else {
-            echo "Disliked";
+            // Delete notification only if it's not self-like
+            if ($user_id != $post_owner_id) {
+                $delete_notif = "DELETE FROM twitter_notifications 
+                                 WHERE user_id = $post_owner_id 
+                                 AND from_user_id = $user_id 
+                                 AND type = 'like' 
+                                 AND post_id = $post_id";
+                $conn->query($delete_notif);
+            }
         }
     } else {
         // Like
-        $insert = "INSERT INTO twitter_likes (user_id, liked_id, likeable_type) VALUES ($id, $post_id, '$type')";
+        $insert = "INSERT INTO twitter_likes (user_id, liked_id, likeable_type) VALUES ($user_id, $post_id, '$type')";
         $result = $conn->query($insert);
         if (!$result) {
             echo "Insert error: " . $conn->error;
         } else {
-            echo "Liked";
+            // Insert notification only if it's not self-like
+            if ($user_id != $post_owner_id) {
+                $message = "@$username liked your post.";
+                $insert_notification = "INSERT INTO twitter_notifications(user_id, from_user_id, type, message, post_id) 
+                                        VALUES ($post_owner_id, $user_id, 'like', '$message', $post_id)";
+                $conn->query($insert_notification);
+            }
         }
     }
 }
-
 
 /*----------------------------- Comment Insert-----------------------*/
 if (isset($_POST['action']) && $_POST['action'] == 'insert_comment') {
     $post_id = $_POST['post_id'];
     $comment = $_POST['comment'];
     $username = $_SESSION['username'];
+
+    // Get logged-in user
     $u_query = "SELECT * FROM twitter_users WHERE username = '$username'";
     $u_result = $conn->query($u_query);
     $u_data = $u_result->fetch_object();
     $user_id = $u_data->id;
 
+    // Get post owner ID
+    $get_user_query = "SELECT user_id FROM twitter_posts WHERE id = '$post_id'";
+    $get_result = $conn->query($get_user_query);
+    $get_data = $get_result->fetch_object();
+    $post_owner_id = $get_data->user_id;
 
+    // Insert comment
     $insert = "INSERT INTO twitter_comments (user_id, post_id, comment) VALUES ($user_id, $post_id, '$comment')";
     $result = $conn->query($insert);
+    
     if (!$result) {
         echo "Insert error: " . $conn->error;
     } else {
-        echo "Commented";
+        // Insert notification ONLY if user is not commenting on their own post
+        if ($user_id != $post_owner_id) {
+            $insert_notification = "INSERT INTO twitter_notifications(user_id, from_user_id, type, message, comment_content, post_id) 
+                VALUES ('$post_owner_id', '$user_id', 'comment', '@$username commented on your post.', '$comment', '$post_id')";
+            $conn->query($insert_notification);
+        }
+
+        echo "Comment added";
     }
 }
+
+
 
 /*----------------------------- Show Notifications-----------------------*/
 if (isset($_POST['action']) && $_POST['action'] == 'show_notifications') {
@@ -899,16 +954,21 @@ if (isset($_POST['action']) && $_POST['action'] == 'show_notifications') {
         $fetch_user = "SELECT * FROM twitter_users WHERE id = '$n_data->from_user_id'";
         $run_user = $conn->query($fetch_user);
         $users_data = $run_user->fetch_object();
+        $profile = $users_data->profile_pic ? 'profile_pic/' . $users_data->profile_pic . '' : 'images/profile_pic.png';
         $notifications .= "<div class='n_parent'>
                             <div class='n_img'>
-                                <img src='profile_pic/$users_data->profile_pic' alt='' height='40px'>
+                                <img src=$profile alt='' height='40px'>
                             </div>
                             <div class='n_userdata'>
                                 <p>
+                                    <input type='hidden' id='n_hidden' value='0'>
                                     <span class='n_name'>$users_data->name</span>
                                     <span class='n_username'>@$users_data->username</span>
-                                    <span class='n_time'>· May 12</span><br>
-                                    <span class='n_msg'>$n_data->message</span>
+                                    <span class='post-delete-icon'>
+                                        <i class='fa-solid fa-ellipsis' onclick='before_delete_notification($n_data->id)'></i>
+                                    </span><br>
+                                    <span class='n_msg'>$n_data->message</span><br>
+                                    <span class='n_comment'>$n_data->comment_content</span>
                                 </p>
                             </div>
                         </div>";
@@ -1096,246 +1156,55 @@ if (isset($_POST['action']) && $_POST['action'] == "show_foryou_post") {
 
 
 /*------------------------Show Other User Posts---------------------*/
-
 if (isset($_POST['action']) && $_POST['action'] == "show_user_post") {
-    $username = $_POST['username'];
+    $username = $conn->real_escape_string($_POST['username']);
     $current_user = $_SESSION['username'];
-    $sel = "SELECT * FROM twitter_users WHERE username = '$current_user'";
+
+    // Get current user id
+    $sel = "SELECT id FROM twitter_users WHERE username = '$current_user'";
     $run_user = $conn->query($sel);
+    if (!$run_user) {
+        echo "Error: " . $conn->error;
+        exit;
+    }
     $current_user_data = $run_user->fetch_object();
 
-
+    // Get requested user id
     $fetch_id_query = "SELECT id FROM twitter_users WHERE username = '$username'";
     $run = $conn->query($fetch_id_query);
     if (!$run) {
         echo "Data fetch error: " . $conn->error;
         exit;
     }
-
     $data = $run->fetch_object();
-    $id = $data->id;
-    $select = "SELECT * FROM twitter_posts WHERE user_id = '$id' ORDER BY id DESC";
-    $run = $conn->query($select);
-    $data = '';
+    $user_id = $data->id;
+
+    // Fetch posts with user info + likes/comments count + if liked by current user
+    $query = "
+        SELECT p.*, u.name, u.username, u.profile_pic,
+            (SELECT COUNT(*) FROM twitter_likes WHERE liked_id = p.id AND likeable_type = 'post') AS total_likes,
+            (SELECT COUNT(*) FROM twitter_comments WHERE post_id = p.id) AS total_comments,
+            (SELECT 1 FROM twitter_likes WHERE user_id = {$current_user_data->id} AND liked_id = p.id AND likeable_type = 'post' LIMIT 1) AS liked_by_user
+        FROM twitter_posts p
+        JOIN twitter_users u ON p.user_id = u.id
+        WHERE p.user_id = $user_id
+        ORDER BY p.id DESC
+    ";
+    $run = $conn->query($query);
+    if (!$run) {
+        echo "Data fetch error: " . $conn->error;
+        exit;
+    }
+
+    date_default_timezone_set("Asia/Kolkata");
+    $today = new DateTime();
     $post_data = '';
+
     while ($data = $run->fetch_object()) {
-        $user_id = $data->user_id;
-
-        /*--------------- Total Likes---------------*/
-        $post_id = $data->id;
-        $query = "SELECT COUNT(*) AS total_likes 
-                            FROM twitter_likes WHERE liked_id = $post_id 
-                            AND likeable_type = 'post'";
-        $result = $conn->query($query);
-
-        if ($result) {
-            $likes = $result->fetch_assoc();
-            $total_likes = $likes['total_likes'];
-            if ($total_likes == 0) {
-                $total_likes = '';
-            }
-        } else {
-            echo "Error: " . $conn->error;
-        }
-
-
-        /*----------------- Check user has liked the post or not--------------------*/
-        $check_query = "SELECT * FROM twitter_likes 
-                WHERE user_id = $current_user_data->id 
-                AND liked_id = $post_id 
-                AND likeable_type = 'post'";
-
-        $check_result = $conn->query($check_query);
-
-        $already_liked = ($check_result->num_rows > 0);
-        $liked = $already_liked ? 'liked' : '';
-
-        /*--------------- Total Comments---------------*/
-        $post_id = $data->id;
-        $query = "SELECT COUNT(*) AS total_comments 
-          FROM twitter_comments 
-          WHERE post_id = $post_id";
-
-        $result = $conn->query($query);
-
-        if ($result) {
-            $comments = $result->fetch_assoc();
-            $total_comments = $comments['total_comments'];
-            if ($total_comments == 0) {
-                $total_comments = '';
-            }
-        } else {
-            echo "Error: " . $conn->error;
-        }
-        //--------------- Time of post--------------------
-        date_default_timezone_set("Asia/Kolkata");
-        $post_date = new DateTime("$data->created_at");
-        $today = new DateTime(date('Y-m-d H:i:s'));
-        $diff = $post_date->diff($today);
-        $print = $diff->format('%s');
-        $title = $post_date->format('h:i A - M j, Y');
-
-        if ($diff->format('%i') < 1) {
-            $print = $diff->format('%s') . 's';
-        }
-        if ($diff->format('%h') < 1 && $diff->format('%i') > 0) {
-            $print = $diff->format('%i') . 'm';
-        }
-        if ($diff->format('%h') > 0) {
-            $print = $diff->format('%h') . 'h';
-        }
-        if ($diff->format('%d') > 0 || $diff->format('%m') > 0) {
-            $print = $post_date->format('M j');
-        }
-        if ($diff->format('%y') > 0) {
-            $print = $post_date->format('M j Y');
-        }
-
-        /*-----------Get User Data to show with posts------*/
-        $user_query = "SELECT * FROM twitter_users WHERE id = '$user_id'";
-        $run_query = $conn->query($user_query);
-        $user_data = $run_query->fetch_object();
-        $profile = $user_data->profile_pic ? 'profile_pic/' . $user_data->profile_pic . '' : 'images/profile_pic.png';
-
-        if ($data->media != "") {
-            $post_data .= "<div class='user-post'>
-                            <div class='post-user-info'>
-                                <img src=$profile alt='Post' height='40px' style='border-radius: 50%'>
-                            </div>
-                            <div class='postuser-name'>
-                                <p>
-                                    <input type='hidden' id='commented' value='0'>
-                                    <input type='hidden' id='other_username' value='0'>
-                                    <input type='hidden' id='commented_foryou' value='0'>
-                                    <input type='hidden' id='hidden' value='0'>
-                                    <span class='post-name'>$user_data->name </span>
-                                    <span class='post-username'>@$user_data->username</span>
-                                    <span class='time' title='$title'>· $print</span>
-                                </p>
-                                <p class='post-content'>$data->content</p>
-                                <div class='post-img'>
-                                    <img src='posts/$data->media' alt='Post Image'>
-                                </div>
-                                <p class='icons'>
-                                    <span class='comment-icon open_comment_modal_foryou' data-post-id='{$data->id}' data-username='{$username}'>
-                                        <img src='images/chat.png' height='17px' title='Reply'>
-                                    </span>
-                                    <span class='comment-count'>$total_comments</span>
-                                    <span class='like-icon' data-post-id='{$data->id}' data-username='{$username}'>
-                                        <i class='heart-icon fa fa-heart $liked' title='Like'></i>
-                                    </span>
-                                    <span class='like'>$total_likes</span>
-                                </p>
-                            </div>
-                        </div>";
-        } else {
-            $post_data .= "<div class='user-post'>
-                            <div class='post-user-info'>
-                                <img src=$profile alt='Post' height='40px' style='border-radius: 50%'>
-                            </div>
-                            <div class='postuser-name'>
-                                <p>
-                                    <input type='hidden' id='commented' value='0'>
-                                    <input type='hidden' id='other_username' value='0'>
-                                    <input type='hidden' id='commented_foryou' value='0'>
-                                    <input type='hidden' id='hidden' value='0'>
-                                    <span class='post-name'>$user_data->name </span>
-                                    <span class='post-username'>@$user_data->username</span>
-                                    <span class='time' title='$title'>· $print</span>
-                                </p>
-                                <p class='post-content'>$data->content</p>
-                                <p class='icons'>
-                                    <span class='comment-icon open_comment_modal_foryou' data-post-id='{$data->id}' data-username='{$username}'>
-                                        <img src='images/chat.png' height='17px' title='Reply'>
-                                    </span>
-                                    <span class='comment-count'>$total_comments</span>
-                                    <span class='like-icon' data-post-id='{$data->id}' data-username='{$username}'>
-                                        <i class='heart-icon fa fa-heart $liked' title='Like'></i>
-                                    </span>
-                                    <span class='like'>$total_likes</span>
-                                </p>
-                            </div>
-                        </div>";
-        }
-    }
-    echo $post_data;
-}
-
-
-
-
-/*------------------------Show Following Posts---------------------*/
-if (isset($_POST['action']) && $_POST['action'] == "following_post") {
-    $username = $_SESSION['username'];
-    $fetch_id_query = "SELECT id FROM twitter_users WHERE username = '$username'";
-    $run = $conn->query($fetch_id_query);
-    if (!$run) {
-        echo "Data fetch error: " . $conn->error;
-        exit;
-    }
-
-    $data = $run->fetch_object();
-    $id = $data->id;
-
-    // Get all following user IDs in a comma-separated list
-    $fetch_following_query = "SELECT following_id FROM twitter_followers WHERE follower_id = '$id'";
-    $following_result = $conn->query($fetch_following_query);
-    if (!$following_result) {
-        echo "Data fetch error: " . $conn->error;
-        exit;
-    }
-
-    $following_ids = [];
-    while ($row = $following_result->fetch_object()) {
-        $following_ids[] = $row->following_id;
-    }
-
-    if (empty($following_ids)) {
-        echo "<p class='follow_people'>Follow people to see their posts.</p>";
-        exit;
-    }
-
-    // Get posts of all followed users, ordered by latest post first
-    $ids_list = implode(",", $following_ids);
-    $fetch_posts_query = "SELECT * FROM twitter_posts WHERE user_id IN ($ids_list) ORDER BY created_at DESC";
-    $posts_result = $conn->query($fetch_posts_query);
-
-    $post_data = '';
-    while ($data = $posts_result->fetch_object()) {
-        $user_id = $data->user_id;
-        $post_id = $data->id;
-
-        // Total Likes
-        $query = "SELECT COUNT(*) AS total_likes 
-                  FROM twitter_likes 
-                  WHERE liked_id = $post_id AND likeable_type = 'post'";
-        $result = $conn->query($query);
-        $total_likes = 0;
-        if ($result) {
-            $likes = $result->fetch_assoc();
-            $total_likes = $likes['total_likes'] ?: '';
-        }
-
-        // Already Liked
-        $check_query = "SELECT 1 FROM twitter_likes 
-                        WHERE user_id = $id AND liked_id = $post_id AND likeable_type = 'post'";
-        $check_result = $conn->query($check_query);
-        $liked = ($check_result->num_rows > 0) ? 'liked' : '';
-
-        // Total Comments
-        $query = "SELECT COUNT(*) AS total_comments 
-                  FROM twitter_comments WHERE post_id = $post_id";
-        $result = $conn->query($query);
-        $total_comments = 0;
-        if ($result) {
-            $comments = $result->fetch_assoc();
-            $total_comments = $comments['total_comments'] ?: '';
-        }
+        $liked = $data->liked_by_user ? 'liked' : '';
 
         // Time formatting
-        date_default_timezone_set("Asia/Kolkata");
         $post_date = new DateTime($data->created_at);
-        $today = new DateTime();
         $diff = $post_date->diff($today);
         $title = $post_date->format('h:i A - M j, Y');
 
@@ -1351,42 +1220,327 @@ if (isset($_POST['action']) && $_POST['action'] == "following_post") {
             $print = $post_date->format('M j Y');
         }
 
-        // Get user data
-        $user_query = "SELECT * FROM twitter_users WHERE id = '$user_id'";
-        $run_query = $conn->query($user_query);
-        $user_data = $run_query->fetch_object();
-        $profile = $user_data->profile_pic ? 'profile_pic/' . $user_data->profile_pic : 'images/profile_pic.png';
-
-        // Prepare post HTML
+        $profile = $data->profile_pic ? 'profile_pic/' . $data->profile_pic : 'images/profile_pic.png';
         $post_media = $data->media ? "<div class='post-img'><img src='posts/{$data->media}' alt='Post Image'></div>" : '';
+
+        $post_data .= "
+            <div class='user-post'>
+                <div class='post-user-info'>
+                    <img src='$profile' alt='Post' height='40px' style='border-radius: 50%'>
+                </div>
+                <div class='postuser-name'>
+                    <p>
+                        <input type='hidden' id='commented' value='0'>
+                        <input type='hidden' id='other_username' value='0'>
+                        <input type='hidden' id='commented_foryou' value='0'>
+                        <input type='hidden' id='hidden' value='0'>
+                        <span class='post-name'>{$data->name}</span>
+                        <span class='post-username'>@{$data->username}</span>
+                        <span class='time' title='$title'>· $print</span>
+                    </p>
+                    <p class='post-content'>{$data->content}</p>
+                    $post_media
+                    <p class='icons'>
+                        <span class='comment-icon open_comment_modal_foryou' data-post-id='{$data->id}' data-username='$username'>
+                            <img src='images/chat.png' height='17px' title='Reply'>
+                        </span>"
+                        . ($data->total_comments > 0 ? "<span class='comment-count'>{$data->total_comments}</span>" : "") .
+                        "<span class='like-icon' data-post-id='{$data->id}' data-username='$username'>
+                            <i class='heart-icon fa fa-heart $liked' title='Like'></i>
+                        </span>" 
+                        . ($data->total_likes > 0 ? "<span class='like'>{$data->total_likes}</span>" : "") . "
+                    </p>
+                </div>
+            </div>";
+    }
+
+    echo $post_data;
+}
+
+/*------------------------Show Following Posts---------------------*/
+if (isset($_POST['action']) && $_POST['action'] == "following_post") {
+    $username = $_SESSION['username'];
+
+    // Get logged-in user id
+    $result = $conn->query("SELECT id FROM twitter_users WHERE username = '$username'");
+    if (!$result) {
+        echo "Data fetch error: " . $conn->error;
+        exit;
+    }
+    $user = $result->fetch_object();
+    $user_id = $user->id;
+
+    // Get following IDs
+    $res = $conn->query("SELECT GROUP_CONCAT(following_id) as ids FROM twitter_followers WHERE follower_id = $user_id");
+    if (!$res) {
+        echo "Data fetch error: " . $conn->error;
+        exit;
+    }
+    $row = $res->fetch_assoc();
+    $ids_list = $row['ids'];
+
+    if (empty($ids_list)) {
+        echo "<p class='follow_people'>Follow people to see their posts.</p>";
+        exit;
+    }
+
+    // Fetch posts with user info and likes/comments count + if logged user liked post
+    $query = "
+        SELECT p.*, u.username, u.name, u.profile_pic,
+            (SELECT COUNT(*) FROM twitter_likes WHERE liked_id = p.id AND likeable_type = 'post') AS total_likes,
+            (SELECT COUNT(*) FROM twitter_comments WHERE post_id = p.id) AS total_comments,
+            (SELECT 1 FROM twitter_likes WHERE user_id = $user_id AND liked_id = p.id AND likeable_type = 'post' LIMIT 1) AS liked_by_user
+        FROM twitter_posts p
+        JOIN twitter_users u ON p.user_id = u.id
+        WHERE p.user_id IN ($ids_list)
+        ORDER BY p.created_at DESC
+    ";
+    $posts_result = $conn->query($query);
+    if (!$posts_result) {
+        echo "Data fetch error: " . $conn->error;
+        exit;
+    }
+
+    date_default_timezone_set("Asia/Kolkata");
+    $today = new DateTime();
+    $post_data = '';
+
+    while ($data = $posts_result->fetch_object()) {
+        $liked = $data->liked_by_user ? 'liked' : '';
+
+        // Time formatting
+        $post_date = new DateTime($data->created_at);
+        $diff = $post_date->diff($today);
+        $title = $post_date->format('h:i A - M j, Y');
+
+        if ($diff->format('%i') < 1) {
+            $print = $diff->format('%s') . 's';
+        } elseif ($diff->format('%h') < 1) {
+            $print = $diff->format('%i') . 'm';
+        } elseif ($diff->format('%d') == 0) {
+            $print = $diff->format('%h') . 'h';
+        } elseif ($diff->format('%y') == 0) {
+            $print = $post_date->format('M j');
+        } else {
+            $print = $post_date->format('M j Y');
+        }
+
+        $profile = $data->profile_pic ? 'profile_pic/' . $data->profile_pic : 'images/profile_pic.png';
+        $post_media = $data->media ? "<div class='post-img'><img src='posts/{$data->media}' alt='Post Image'></div>" : '';
+
         $post_data .= "<div class='user-post'>
-            <div class='post-user-info'>
+            <div class='post-user-info' onclick='show_user(`$data->username`)'>
                 <img src='$profile' alt='Post' height='40px' style='border-radius: 50%'>
             </div>
             <div class='postuser-name'>
-                <p>
-                    <input type='hidden' id='commented' value='0'>
-                    <input type='hidden' id='commented_foryou' value='0'>
-                    <input type='hidden' id='hidden' value='0'>
-                    <span class='post-name'>{$user_data->name}</span>
-                    <span class='post-username'>@{$user_data->username}</span>
+                <p onclick='show_user(`$data->username`)'>
+                    <span class='post-name'>{$data->name}</span>
+                    <span class='post-username'>@{$data->username}</span>
                     <span class='time' title='$title'>· $print</span>
                 </p>
                 <p class='post-content'>{$data->content}</p>
                 $post_media
                 <p class='icons'>
-                    <span class='comment-icon open_comment_modal_foryou' data-post-id='{$post_id}'>
+                    <span class='comment-icon open_comment_modal_foryou' data-post-id='{$data->id}'>
                         <img src='images/chat.png' height='17px' title='Reply'>
                     </span>
-                    <span class='comment-count'>$total_comments</span>
-                    <span class='like-icon' data-post-id='{$post_id}'>
+                    <span class='comment-count'>{$data->total_comments}</span>
+                    <span class='like-icon' data-post-id='{$data->id}'>
                         <i class='heart-icon fa fa-heart $liked' title='Like'></i>
                     </span>
-                    <span class='like'>$total_likes</span>
+                    <span class='like'>{$data->total_likes}</span>
                 </p>
             </div>
         </div>";
     }
 
     echo $post_data;
+}
+
+
+//---------------------Search User-------------------------//
+if (isset($_POST['action']) && $_POST['action'] == 'search') {
+    $search = $_POST['search'];
+    $username = $_SESSION['username'];
+    $sel_footer = "SELECT * FROM twitter_users  WHERE (username LIKE '%$search%' OR name LIKE '%$search%') AND username != '$username' ";
+    $run_footer = $conn->query($sel_footer);
+    $search = "";
+    while ($data = $run_footer->fetch_object()) {
+        $profile = $data->profile_pic ? 'profile_pic/' . $data->profile_pic . '' : 'images/profile_pic.png';
+
+        $search .= "<div class='search_user' onclick='show_user(`$data->username`)'>
+                        <div class='post-user-info' style='margin-top: 10px'>
+                            <img src=$profile alt='Post' height='40px' style='border-radius: 50%'>
+                        </div>
+                        <div class='serach_data' style='margin-top: 10px'>
+                            <p>
+                                <span class='post-name'>$data->name</span><br>
+                                <span class='post-username'>@$data->username</span>
+                            </p>
+                        </div>
+                    </div>";
+    }
+    echo $search;
+}
+//---------------------Show Following-------------------------//
+if (isset($_POST['action']) && $_POST['action'] == 'show_following') {
+    $username = isset($_POST['username']) ? $_POST['username'] : $_SESSION['username'];
+    $current_user = $_SESSION['username'];
+    $fetch_id_query = "SELECT id FROM twitter_users WHERE username = '$username'";
+    $run = $conn->query($fetch_id_query);
+    if (!$run) {
+        echo "Data fetch error: " . $conn->error;
+        exit;
+    }
+    $dataa = $run->fetch_object();
+    $id = $dataa->id;
+
+    $sel_footer = "SELECT * FROM twitter_users JOIN twitter_followers ON
+                    twitter_users.id = twitter_followers.following_id 
+                    WHERE twitter_followers.follower_id = '$id'";
+    $run_footer = $conn->query($sel_footer);
+    $search = "";
+    while ($data = $run_footer->fetch_object()) {
+        $name = $data->username == $current_user ? 'You' : $data->username;
+        $profile = $data->profile_pic ? 'profile_pic/' . $data->profile_pic . '' : 'images/profile_pic.png';
+        $search .= "<div class='search_user' onclick='show_user(`$data->username`)'>
+                        <div class='post-user-info' style='margin-top: 10px'>
+                            <img src=$profile alt='Post' height='40px' style='border-radius: 50%'>
+                        </div>
+                        <div class='serach_data' style='margin-top: 10px'>
+                            <p>
+                                <span class='post-name'>$name</span><br>
+                                <span class='post-username'>@$data->username</span>
+                            </p>
+                        </div>
+                    </div>";
+    }
+    echo $search;
+}
+
+
+//---------------------Show Followers-------------------------//
+if (isset($_POST['action']) && $_POST['action'] == 'show_followers') {
+    $username = isset($_POST['username']) ? $_POST['username'] : $_SESSION['username'];
+    $current_user = $_SESSION['username'];
+
+    // Fetch user ID
+    $fetch_id_query = "SELECT id FROM twitter_users WHERE username = '$username'";
+    $run = $conn->query($fetch_id_query);
+    if (!$run) {
+        echo "Data fetch error: " . $conn->error;
+        exit;
+    }
+    $dataa = $run->fetch_object();
+    $id = $dataa->id;
+
+    // Fetch followers of the user
+    $sel_footer = "SELECT twitter_users.* FROM twitter_users 
+                    JOIN twitter_followers ON twitter_users.id = twitter_followers.follower_id 
+                    WHERE twitter_followers.following_id = '$id'";
+    $run_footer = $conn->query($sel_footer);
+    if (!$run_footer) {
+        echo "Data fetch error: " . $conn->error;
+        exit;
+    }
+
+    $search = "";
+    while ($data = $run_footer->fetch_object()) {
+        $name = ($data->username == $current_user) ? 'You' : $data->username;
+        $profile = $data->profile_pic ? 'profile_pic/' . $data->profile_pic : 'images/profile_pic.png';
+
+        $search .= "<div class='search_user' onclick='show_user(`$data->username`)'>
+                        <div class='post-user-info' style='margin-top: 10px'>
+                            <img src=$profile alt='Post' height='40px' style='border-radius: 50%'>
+                        </div>
+                        <div class='serach_data' style='margin-top: 10px'>
+                            <p>
+                                <span class='post-name'>$name</span><br>
+                                <span class='post-username'>@$data->username</span>
+                            </p>
+                        </div>
+                    </div>";
+    }
+
+    echo $search;
+}
+
+
+
+//---------------------Show Comments-------------------------//
+if (isset($_POST['action']) && $_POST['action'] == 'show_comments') {
+    $username = $_SESSION['username'];
+    $fetch_id_query = "SELECT id FROM twitter_users WHERE username = '$username'";
+    $run = $conn->query($fetch_id_query);
+    if (!$run) {
+        echo "Data fetch error: " . $conn->error;
+        exit;
+    }
+    $dataa = $run->fetch_object();
+    $id = $dataa->id;
+
+    // Fetch all comments on posts created by the logged-in user
+    $sel_footer = "SELECT 
+                        c.comment, 
+                        c.id as comment_id, 
+                        c.post_id,
+                        c.user_id as commentator_id,
+                        p.content, 
+                        p.media,
+                        p.user_id as post_owner_id,
+                        u1.name as commentator_name, 
+                        u1.username as commentator_username, 
+                        u1.profile_pic as commentator_profile_pic,
+                        u2.name as post_owner_name,
+                        u2.username as post_owner_username,
+                        u2.profile_pic as post_owner_profile_pic
+                    FROM twitter_comments c
+                    JOIN twitter_posts p ON c.post_id = p.id
+                    JOIN twitter_users u1 ON c.user_id = u1.id
+                    JOIN twitter_users u2 ON p.user_id = u2.id
+                    WHERE p.user_id = '$id'
+                    ORDER BY c.id DESC";
+
+    $run_footer = $conn->query($sel_footer);
+    if (!$run_footer) {
+        echo "Data fetch error: " . $conn->error;
+        exit;
+    }
+
+    $search = "";
+    while ($data = $run_footer->fetch_object()) {
+        $post_owner_profile = $data->post_owner_profile_pic ? 'profile_pic/' . $data->post_owner_profile_pic : 'images/profile_pic.png';
+        $commentator_profile = $data->commentator_profile_pic ? 'profile_pic/' . $data->commentator_profile_pic : 'images/profile_pic.png';
+        $media = $data->media ? "<img src='posts/$data->media' height='100px'>" : "";
+
+        $search .= "<div class='c_user_data' onclick='show_user(`$data->post_owner_username`)'>
+                        <div class='u_user_img'>
+                            <img src=$post_owner_profile alt='' height='40px' style='border-radius: 50%;'>
+                        </div>
+                        <div class='c_usernames'>
+                            <p>
+                                <span class='c_name'>$data->post_owner_name</span>
+                                <span class='c_username'>@$data->post_owner_username</span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class='c_user_post'>
+                        <p>$data->content</p>
+                        <div>$media</div>
+                    </div>
+                   
+                    <div class='c_user_data' onclick='show_user(`$data->commentator_username`)'>
+                        <div class='u_user_img'>
+                            <img src=$commentator_profile alt='' height='40px' style='border-radius: 50%;'>
+                        </div>
+                        <div class='c_usernames'>
+                            <p>
+                                <span class='c_name'>$data->commentator_name</span>
+                                <span class='c_username'>@$data->commentator_username</span><br>
+                                <span>$data->comment</span>
+                            </p>
+                        </div>
+                    </div>";
+    }
+    echo $search;
 }
