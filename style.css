@@ -619,6 +619,13 @@
     border-radius: 5px;
     margin-left: 250px;
 }
+.notif-dot {
+    width: 9px;
+    height: 9px;
+    background: #1DA1F2; /* Twitter blue */
+    border-radius: 50%;
+    display: inline-block;
+}
 
 .show_notifications {
     margin-top: 120px;
