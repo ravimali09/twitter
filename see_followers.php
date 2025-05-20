@@ -2,7 +2,7 @@
 include_once 'headers.php'
     ?>
 <div class="middle">
-    <h4 class="follow_user">Ravi Mali</h4>
+    <h4 class="follow_user"></h4>
     <div class="ul_list">
         <ul>
             <a href="#">
@@ -25,13 +25,37 @@ include_once 'headers.php'
 
 </div>
 
-
+<div class="footers">
+    <div class="follow_footer">
+        <p class="what">What's happening</p>
+        <div class="trending">
+            <span>Politics · Trending</span>
+            <p>#BJP</p>
+            <span>Trending</span>
+            <p>#War2</p>
+            <span>Trending</span>
+            <p>Sehwag</p>
+            <span>Trending</span>
+            <p>#stufflistingsarmy </p>
+            <span>Music · Trending</span>
+            <p>To Me</p>
+        </div>
+    </div>
+    <div class="footerss">
+        <a href="#" class="f-anchor">Terms of Service |</a>
+        <a href="#" class="f-anchor"> Privacy Policy |</a>
+        <a href="#" class="f-anchor"> Cookie Policy |</a>
+        <a href="#" class="f-anchor"> Accessibility |</a>
+        <a href="#" class="f-anchor"> Ads info |</a>
+        <a href="#" class="f-anchor"> © <?php echo date('Y') ?> X Corp.</a>
+    </div>
+</div>
 <?php
 if (isset($_GET['username'])) {
     $username = $_GET['username'];
     $_SESSION['other_user'] = $username;
 }
-$username = $_SESSION['other_user'];
+$username = isset($_SESSION['other_user'])  ? $_SESSION['other_user'] : "";
 $current_user = $_SESSION['username'];
 ?>
 <script>
