@@ -57,6 +57,11 @@ include_once 'footers.php';
     </div>
 </div>
 
+<!--------------------Reply Modal--------------------->
+<?php
+    include_once 'reply_modal.php';
+?>
+
 <?php
 if (isset($_GET['id'])) {
     $id = $_GET['id'];

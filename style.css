@@ -20,6 +20,14 @@
     height: 100%;
 }
 
+.single_reply {
+    padding-left: 50px;
+    border: 1px solid rgb(245, 245, 245);
+}
+.single_reply:hover{
+    background-color: rgb(247, 247, 247);
+    cursor: pointer;
+}
 .forms {
     margin-left: 50px;
     width: 60%;
@@ -546,7 +554,8 @@
 
 #comment_input,
 #comment_input_p,
-#reply_input_p {
+#reply_input_p,
+#replyy_input_p {
     margin-top: 8px;
     margin-left: 40px;
     width: 380px;
@@ -575,7 +584,8 @@
 .comment_reply_btn_forYou,
 .comment_reply_modal,
 .comment_btn_p,
-.reply_btn {
+.reply_btn,
+.replyy_btn {
     color: white;
     background-color: grey;
     border: none;
@@ -1181,9 +1191,11 @@
     padding: 15px;
     border-radius: 50%;
 }
-.comment-icon:hover{
+
+.comment-icon:hover {
     cursor: pointer;
 }
+
 .username_d {
     color: grey;
 }
@@ -1193,10 +1205,16 @@
 }
 
 .like-icon,
-.comment-like-icon {
+.comment-like-icon,
+.reply-like-icon {
     padding: 15px;
     border-radius: 50%;
     margin-left: 220px;
+}
+
+.comment-like-icon:hover,
+.like-icon:hover {
+    cursor: pointer;
 }
 
 .posts {
