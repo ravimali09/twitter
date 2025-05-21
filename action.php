@@ -24,6 +24,68 @@ if (isset($_POST['action']) && $_POST['action'] == 'fetch') {
     }
     echo json_encode($arr);
 }
+//-----------Notification Mark as read-------------//
+if (isset($_POST['action']) && $_POST['action'] == 'mark_read') {
+    $username = $_SESSION['username'];
+    echo $username;
+
+    // Get user ID
+    $get_user = "SELECT id FROM twitter_users WHERE username = '$username'";
+    $run_user = $conn->query($get_user);
+    $uid = 0;
+
+    if ($run_user->num_rows > 0) {
+        $user = $run_user->fetch_object();
+        $uid = $user->id;
+        echo $uid;
+    }
+
+    //  Mark all notifications as read
+    $update = "UPDATE twitter_notifications SET is_read = 1 WHERE user_id = '$uid'";
+    $run = $conn->query($update);
+    if (!$run) {
+        echo json_encode(['error' => 'User query failed: ' . $conn->error]);
+        exit;
+    }
+    echo $uid;
+}
+//------------Fetch Notifications------------------??
+if (isset($_POST['action']) && $_POST['action'] == 'check') {
+    $username = $_SESSION['username'] ?? '';
+
+    // Get user ID
+    $user_q = "SELECT id FROM twitter_users WHERE username = '$username'";
+    $user_run = $conn->query($user_q);
+
+    if (!$user_run) {
+        echo json_encode(['error' => 'User query failed: ' . $conn->error]);
+        exit;
+    }
+
+    if ($user_run->num_rows > 0) {
+        $user = $user_run->fetch_object();
+        $uid = $user->id;
+    } else {
+        echo json_encode(['error' => 'User not found']);
+        exit;
+    }
+
+    // Notification count
+    $q = "SELECT COUNT(*) AS total FROM twitter_notifications WHERE user_id = '$uid' AND is_read = 0";
+    $run = $conn->query($q);
+
+    if (!$run) {
+        echo json_encode(['error' => 'Notif query failed: ' . $conn->error]);
+        exit;
+    }
+
+    $row = $run->fetch_object();
+    $arr = ['unread' => $row->total];
+
+    echo json_encode($arr);
+}
+
+
 //----------------Profile Pic---------------//
 if (isset($_POST['action']) && $_POST['action'] == 'profile_pic') {
     $username = $_SESSION['username'];

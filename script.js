@@ -965,6 +965,24 @@ $(document).ready(function () {
     follower();
     show_notifications();
 
+    //------------Fetch NOtifications----------//
+    setInterval(function () {
+        $.ajax({
+            url: "action.php",
+            type: "POST",
+            data: { 'action': "check" },
+            success: function (res) {
+                var data =  JSON.parse(res);
+                if (data.unread > 0) {
+                    $("#notifDot").css('display','inline-block');
+                } else {
+                    $("#notifDot").css('display','none');
+                }
+            }
+        });
+    }, 500);
+
+
 
     $(document).on('click', '.edit', function () {
         $('.error').text("");

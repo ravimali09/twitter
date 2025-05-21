@@ -74,7 +74,7 @@ if (!isset($_SESSION['login'])) {
                     <li>
                         <i class="fa-solid fa-bell"></i>
                         <span id="notification">Notifications</span>
-                        <span class="notif-dot"></span>
+                        <span class="notif-dot" id="notifDot"></span>
                     </li>
                 </a>
                 <a href="#">

@@ -625,6 +625,7 @@
     background: #1DA1F2; /* Twitter blue */
     border-radius: 50%;
     display: inline-block;
+    display: none;
 }
 
 .show_notifications {
