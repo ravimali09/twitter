@@ -1228,29 +1228,62 @@ if (isset($_POST['action']) && $_POST['action'] == 'show_notifications') {
     $notifications = "";
     $fetch_notifications = "SELECT * FROM twitter_notifications WHERE user_id = '$id' ORDER BY id DESC";
     $run_notifications = $conn->query($fetch_notifications);
+
     while ($n_data = $run_notifications->fetch_object()) {
+        // Get user who triggered the notification
         $fetch_user = "SELECT * FROM twitter_users WHERE id = '$n_data->from_user_id'";
         $run_user = $conn->query($fetch_user);
         $users_data = $run_user->fetch_object();
-        $profile = $users_data->profile_pic ? 'profile_pic/' . $users_data->profile_pic . '' : 'images/profile_pic.png';
+
+        $profile = $users_data->profile_pic ? 'profile_pic/' . $users_data->profile_pic : 'images/profile_pic.png';
+
+        //------------------ Time ago formatting ------------------
+        date_default_timezone_set("Asia/Kolkata");
+        $noti_date = new DateTime($n_data->created_at);
+        $now = new DateTime(date('Y-m-d H:i:s'));
+        $diff = $noti_date->diff($now);
+        $print = $diff->format('%s') . 's';
+
+        if ($diff->format('%i') < 1) {
+            $print = $diff->format('%s') . 's';
+        }
+        if ($diff->format('%h') < 1 && $diff->format('%i') > 0) {
+            $print = $diff->format('%i') . 'm';
+        }
+        if ($diff->format('%h') >= 1) {
+            $print = $diff->format('%h') . 'h';
+        }
+        if ($diff->format('%d') > 0 || $diff->format('%m') > 0) {
+            $print = $noti_date->format('M j');
+        }
+        if ($diff->format('%y') > 0) {
+            $print = $noti_date->format('M j Y');
+        }
+
+        $title = $noti_date->format('h:i A - M j, Y');
+
+        //------------- Append HTML with time display ------------------
         $notifications .= "<div class='n_parent'>
-                            <div class='n_img'  onclick='show_user(`$users_data->username`)'>
-                                <img src=$profile alt='' height='40px'>
-                            </div>
-                            <div class='n_userdata'>
-                                <p>
-                                    <input type='hidden' id='n_hidden' value='0'>
-                                    <span class='n_name'  onclick='show_user(`$users_data->username`)'>$users_data->name</span>
-                                    <span class='n_username'  onclick='show_user(`$users_data->username`)'>@$users_data->username</span>
-                                    <span class='post-delete-icon'>
-                                        <i class='fa-solid fa-ellipsis' onclick='before_delete_notification($n_data->id)'></i>
-                                    </span><br>
-                                    <span class='n_msg'>$n_data->message</span><br>
-                                    <span class='n_comment'>$n_data->comment_content</span>
-                                </p>
-                            </div>
-                        </div>";
+            <div class='n_img' onclick='show_user(`$users_data->username`)'>
+                <img src='$profile' alt='' height='40px'>
+            </div>
+            <div class='n_userdata'>
+                <p>
+                    <input type='hidden' id='n_hidden' value='0'>
+                    <span class='n_name' onclick='show_user(`$users_data->username`)'>$users_data->name</span>
+                    <span class='n_username' onclick='show_user(`$users_data->username`)'>@$users_data->username </span>
+                    <span class='n_time' title='$title'> · $print</span>
+
+                    <span class='post-delete-icon'>
+                        <i class='fa-solid fa-ellipsis' onclick='before_delete_notification($n_data->id)'></i>
+                    </span><br>
+                    <span class='n_msg'>$n_data->message</span><br>
+                    <span class='n_comment'>$n_data->comment_content</span><br>
+                </p>
+            </div>
+        </div>";
     }
+
     echo $notifications;
 }
 
