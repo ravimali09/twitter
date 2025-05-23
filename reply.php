@@ -64,28 +64,29 @@
             <div class="modal-body">
                 <form id="nested_reply_form">
                     <input type="hidden" id="reply_id_input">
+                    <input type="hidden" id="parent_id_input">
                     <input type="hidden" id="comment_id_input">
                     <div class="parent_div d-flex mb-2">
                         <img src="images/profile_pic.png" alt="" height="40px" style="border-radius: 50%;" class="me-2">
                         <div>
                             <p class="mb-0">
-                                <strong><?php echo $_SESSION['name']; ?></strong>
+                                <span><?php echo $_SESSION['name']; ?></span>
                                 <span style="color: grey;">@<?php echo $_SESSION['username']; ?></span>
                             </p>
                         </div>
                     </div>
                     <div class="mb-2">
-                        <input type="text" class="form-control" id="nested_reply_input" placeholder="Write your reply..." maxlength="500">
-                        <small class="text-muted"><span class="nested_reply_char_count">500</span> characters left</small>
-                        <p class="text-danger nested_reply_error mt-1"></p>
+                        <input type="text"  id="nested_reply_input" placeholder="Post your reply" maxlength="500">
+                        <small class="text-muted"><span class="nested_reply_char_count">500</span> </small>
+                        <p class="error nested_reply_error mt-1"></p>
                     </div>
                 </form>
             </div>
 
             <!-- Modal Footer -->
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary nested_reply_submit_btn">Reply</button>
-            </div>
+                <button type="button" class="nested_reply_submit_btn">Reply</button>
+            </div> 
         </div>
     </div>
 </div>
