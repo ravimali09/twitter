@@ -21,6 +21,7 @@ function comments_details(id) {
         type: 'post',
         data: { 'action': 'comments_details', 'id': id },
         success: function (data) {
+            console.log(data)
             if (data) {
                 $(".user_comment").html(data)
             }
@@ -276,6 +277,39 @@ function delete_comment(id, post_id) {
                     show_comments();
                     post_details(post_id)
                 }
+            }
+        });
+    }
+}
+/*------------------- Delete Reply-----------------*/
+function delete_reply(reply_id, comment_id) {
+    var conf = confirm("Do you really want to delete this reply?");
+    if (conf == true) {
+        console.log('aaaaaaaaaaaaaaa')
+        $.ajax({
+            url: "action.php",
+            type: "post",
+            data: { "action": "delete_reply", "reply_id": reply_id },
+            success: function (data) {
+                comments_details(comment_id)
+            }
+        });
+    }
+}
+/*------------------- Delete Reply-----------------*/
+function delete_replyy(reply_id, parent_id, comment_id) {
+    var conf = confirm("Do you really want to delete this reply?");
+    if (conf == true) {
+        $.ajax({
+            url: "action.php",
+            type: "post",
+            data: { "action": "delete_reply", "reply_id": reply_id },
+            success: function (data) {
+               if(parent_id!=0){
+                 reply_details(parent_id)
+               }else{
+                comments_details(comment_id)
+               }
             }
         });
     }
@@ -621,7 +655,7 @@ function delete_posts() {
                     window.location = 'profile.php';
                 } else if (context === 'index') {
                     window.location = 'index.php';
-                }  else {
+                } else {
                     window.location = 'index.php';
                 }
             }

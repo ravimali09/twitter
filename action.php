@@ -99,6 +99,12 @@ if (isset($_POST['action']) && $_POST['action'] == 'delete_comment') {
     $delete_comments = "DELETE FROM twitter_comments WHERE id = '$id'";
     $run = $conn->query($delete_comments);
 }
+//----------------Delete Reply---------------//
+if (isset($_POST['action']) && $_POST['action'] == 'delete_reply') {
+    $reply_id = $_POST['reply_id'];
+    $delete_reply = "DELETE FROM twitter_replies WHERE id = '$reply_id'";
+    $run = $conn->query($delete_reply);
+}
 
 //----------------Follow Unfollow---------------//
 if (isset($_POST['action']) && $_POST['action'] == 'follow_unfollow') {
@@ -2098,8 +2104,9 @@ if (isset($_POST['action']) && $_POST['action'] == 'post_details') {
     $comment_q = "SELECT COUNT(*) AS total_comments FROM twitter_comments WHERE post_id = $post->id";
     $comments = $conn->query($comment_q)->fetch_assoc();
     $total_comments = $comments['total_comments'] ?: '';
+    $post_owner_id = $post->post_user_id;
 
-    // Condition check for ellipsis menu
+    // Condition check for ellipsis menu(post delete)
     $del = "";
     if ($post->post_user_id == $user_id) {
         $del = "<span class='post-delete-icon'>
@@ -2180,15 +2187,14 @@ if (isset($_POST['action']) && $_POST['action'] == 'post_details') {
 
         $c_pic = $comment->profile_pic ? 'profile_pic/' . $comment->profile_pic : 'images/profile_pic.png';
 
-        // Condition check for ellipsis menu
-        $del = "";
-        if ($comment->user_id == $user_id) {
+        // Condition check for ellipsis menu(comment delete)
+        $del_cmt = "";
+        if ($comment->user_id == $user_id || $post_owner_id == $user_id) {
             $del_cmt = "<span class='post-delete-icon'>
                         <i class='fa-solid fa-ellipsis' onclick='delete_comment($comment->comment_id, $post_id)'></i>
                     </span>";
-        }
-        else{
-            $del_cmt="";
+        } else {
+            $del_cmt = "";
         }
 
 
@@ -2214,8 +2220,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'post_details') {
                             <span class='name_d'  onclick='show_user(`$comment->username`)'>$comment->name </span>
                             <span class='username_d'  onclick='show_user(`$comment->username`)'>@$comment->username</span>
                             <span class='time'>· $print</span>
-                            <span> $del_cmt</span>
-                            
+                            <span> $del_cmt</span>                            
                         </p>
                         <div onclick='show_comment(`$comment->comment_id`)'>
                             <p class='comment_content' style='overflow-wrap: anywhere; padding: 0 20px;'>$comment->comment</p>
@@ -2258,12 +2263,23 @@ if (isset($_POST['action']) && $_POST['action'] == 'comment_details') {
 
     // Get comment details
     $comment_query = "SELECT 
-                        c.id AS comment_id, c.comment, c.created_at, c.user_id AS comment_user_id,
-                        u.name AS comment_owner_name, u.username AS comment_owner_username, u.profile_pic AS comment_owner_profile
+                        c.id AS comment_id, 
+                        c.comment, 
+                        c.created_at, 
+                        c.user_id AS comment_user_id,
+                        c.post_id,
+
+                        u.name AS comment_owner_name, 
+                        u.username AS comment_owner_username, 
+                        u.profile_pic AS comment_owner_profile,
+
+                        p.user_id AS post_owner_id 
                     FROM twitter_comments c
                     JOIN twitter_users u ON c.user_id = u.id
+                    JOIN twitter_posts p ON c.post_id = p.id
                     WHERE c.id = '$comment_id'
-                    LIMIT 1";
+                    LIMIT 1
+                    ";
 
     $comment_result = $conn->query($comment_query);
     if (!$comment_result || $comment_result->num_rows == 0) {
@@ -2306,6 +2322,16 @@ if (isset($_POST['action']) && $_POST['action'] == 'comment_details') {
     $replies = $conn->query($replies_q)->fetch_assoc();
     $total_replies = $replies['total_replies'] ?: '';
 
+    // Condition check for ellipsis menu(comment delete)
+    $del_cmt = "";
+    if ($comment->comment_user_id == $user_id || $user_id == $comment->post_owner_id) {
+        $del_cmt = "<span class='post-delete-icon'>
+                        <i class='fa-solid fa-ellipsis' onclick='delete_comment($comment->comment_id, $comment->post_id)'></i>
+                    </span>";
+    } else {
+        $del_cmt = "";
+    }
+
     // Start HTML output
     $html = "<div class='mydiv'>
                 <div style='display: flex;'>
@@ -2317,6 +2343,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'comment_details') {
                             <span class='name_d'>$comment->comment_owner_name </span>
                             <span class='username_d'>@$comment->comment_owner_username</span>
                             <span class='time' title='$title'>· $print</span>
+                            <span> $del_cmt</span>
                         </p>
                         <p class='post-content' style='overflow-wrap: anywhere; padding: 0 20px;'>$comment->comment</p>
                         <div class='comment_media'></div>
@@ -2354,7 +2381,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'comment_details') {
 
     // Fetch all replies for the comment
     $reply_query = "SELECT 
-                        r.id AS reply_id, r.parent_reply_id AS parent_id, r.reply, r.created_at,
+                        r.id AS reply_id, r.parent_reply_id AS parent_id, r.reply, r.created_at,r.user_id,
                         u.name AS reply_owner_name, u.username AS reply_owner_username, u.profile_pic AS reply_owner_profile
                     FROM twitter_replies r
                     JOIN twitter_users u ON r.user_id = u.id
@@ -2396,6 +2423,16 @@ if (isset($_POST['action']) && $_POST['action'] == 'comment_details') {
             $check_nested_like = "SELECT * FROM twitter_likes WHERE user_id = $user_id AND liked_id = $reply->reply_id AND likeable_type = 'reply'";
             $nested_liked = $conn->query($check_nested_like)->num_rows > 0 ? 'liked' : '';
 
+            // Condition check for ellipsis menu(reply delete)
+            $del_reply = "";
+            if ($reply->user_id == $user_id || $user_id == $comment->post_owner_id) {
+                $del_reply = "<span class='post-delete-icon'>
+                        <i class='fa-solid fa-ellipsis' onclick='delete_reply($reply->reply_id, $comment->comment_id)'></i>
+                    </span>";
+            } else {
+                $del_reply = "";
+            }
+
             $html .= "<div class='single_reply'>
                         <div style='display: flex;'>
                             <div class='post-user-info'>
@@ -2406,6 +2443,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'comment_details') {
                                     <span class='name_d'>$reply->reply_owner_name</span>
                                     <span class='username_d'>@$reply->reply_owner_username</span>
                                     <span class='time' title='$reply_title'>· $reply_print</span>
+                                    <span> $del_reply</span>
                                 </p>
                                 <p class='post-content' onclick='show_reply(`$reply->reply_id`)' style='overflow-wrap: anywhere; padding: 0 20px;'>$reply->reply</p>
                                 <div class='post_details'>
@@ -2446,12 +2484,24 @@ if (isset($_POST['action']) && $_POST['action'] == 'reply_details') {
 
     // Get parent reply details
     $comment_query = "SELECT 
-                        r.id AS reply_id, r.reply, r.created_at, r.user_id AS reply_user_id, r.comment_id, r.parent_reply_id as parent_id,
-                        u.name AS comment_owner_name, u.username AS comment_owner_username, u.profile_pic AS comment_owner_profile
-                      FROM twitter_replies r
-                      JOIN twitter_users u ON r.user_id = u.id
-                      WHERE r.id = $reply_id
-                      LIMIT 1";
+                        r.id AS reply_id, 
+                        r.reply, 
+                        r.created_at, 
+                        r.user_id AS reply_user_id, 
+                        r.comment_id, 
+                        r.parent_reply_id AS parent_id,
+
+                        u.name AS comment_owner_name, 
+                        u.username AS comment_owner_username, 
+                        u.profile_pic AS comment_owner_profile,
+
+                        p.user_id AS post_owner_id 
+                    FROM twitter_replies r
+                    JOIN twitter_users u ON r.user_id = u.id
+                    JOIN twitter_comments c ON r.comment_id = c.id
+                    JOIN twitter_posts p ON c.post_id = p.id
+                    WHERE r.id = $reply_id
+                    LIMIT 1";
 
     $comment_result = $conn->query($comment_query);
     if (!$comment_result || $comment_result->num_rows === 0) {
@@ -2461,6 +2511,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'reply_details') {
 
     $comment = $comment_result->fetch_object();
     $comment_id = $comment->comment_id;
+    $parent_id = isset($comment->parent_id) ? $comment->parent_id : 0;
     date_default_timezone_set("Asia/Kolkata");
     $today = new DateTime();
     $comment_date = new DateTime($comment->created_at);
@@ -2489,6 +2540,16 @@ if (isset($_POST['action']) && $_POST['action'] == 'reply_details') {
     $replies = $conn->query("SELECT COUNT(*) AS total_replies FROM twitter_replies WHERE parent_reply_id = $reply_id")->fetch_assoc();
     $total_replies = $replies['total_replies'] ?: '';
 
+    // Condition check for ellipsis menu(reply delete)
+    $del_reply = "";
+    if ($comment->reply_user_id == $user_id || $user_id == $comment->post_owner_id) {
+        $del_reply = "<span class='post-delete-icon'>
+                        <i class='fa-solid fa-ellipsis' onclick='delete_replyy($comment->reply_id, $parent_id, $comment_id)'></i>
+                    </span>";
+    } else {
+        $del_reply = "";
+    }
+
     // Start output
     $html = "<div class='mydiv'>
                 <div style='display: flex;'>
@@ -2500,6 +2561,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'reply_details') {
                             <span class='name_d'>$comment->comment_owner_name</span>
                             <span class='username_d'>@$comment->comment_owner_username</span>
                             <span class='time' title='$title'>· $print</span>
+                            <span> $del_reply</span>
                         </p>
                         <p class='post-content' style='overflow-wrap: anywhere; padding: 0 20px;'>$comment->reply</p>
                     </div>
@@ -2536,7 +2598,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'reply_details') {
 
     // Get nested replies 
     $nested_query = "SELECT 
-                        r.id AS reply_id, r.reply, r.created_at, r.comment_id,
+                        r.id AS reply_id, r.reply, r.created_at, r.comment_id,r.user_id AS reply_user_id, r.parent_reply_id AS parent_id,
                         u.name AS reply_owner_name, u.username AS reply_owner_username, u.profile_pic AS reply_owner_profile
                      FROM twitter_replies r
                      JOIN twitter_users u ON r.user_id = u.id
@@ -2571,6 +2633,15 @@ if (isset($_POST['action']) && $_POST['action'] == 'reply_details') {
 
             $nested_count = $conn->query("SELECT COUNT(*) AS total FROM twitter_replies WHERE parent_reply_id = $reply->reply_id")->fetch_assoc();
             $nested_reply_count = $nested_count['total'] ?: '';
+            // Condition check for ellipsis menu(reply delete)
+            $del_reply = "";
+            if ($reply->reply_user_id == $user_id || $user_id == $comment->post_owner_id) {
+                $del_reply = "<span class='post-delete-icon'>
+                        <i class='fa-solid fa-ellipsis' onclick='delete_replyy($reply->reply_id, $reply->parent_id)'></i>
+                    </span>";
+            } else {
+                $del_reply = "";
+            }
 
             $html .= "<div class='single_reply'>
                         <div style='display: flex;'>
@@ -2582,6 +2653,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'reply_details') {
                                     <span class='name_d'>$reply->reply_owner_name</span>
                                     <span class='username_d'>@$reply->reply_owner_username</span>
                                     <span class='time' title='$reply_title'>· $reply_print</span>
+                                    <span> $del_reply</span>
                                 </p>
                                 <p class='post-content' onclick='show_reply(`$reply->reply_id`)' style='overflow-wrap: anywhere; padding: 0 20px;'>$reply->reply</p>
                                 <div class='post_details'>
